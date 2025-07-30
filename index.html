@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ahorcado en Español</title>
+<style>
+  /* RESET CSS - Eric Meyer 2.0 */
+  html, body, div, span, applet, object, iframe,
+  h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+  a, abbr, acronym, address, big, cite, code,
+  del, dfn, em, img, ins, kbd, q, s, samp,
+  small, strike, strong, sub, sup, tt, var,
+  b, u, i, center,
+  dl, dt, dd, ol, ul, li,
+  fieldset, form, label, legend,
+  table, caption, tbody, tfoot, thead, tr, th, td,
+  article, aside, canvas, details, embed,
+  figure, figcaption, footer, header, hgroup,
+  menu, nav, output, ruby, section, summary,
+  time, mark, audio, video {
+    margin: 0; padding: 0; border: 0; font-size: 100%; font: inherit; vertical-align: baseline;
+  }
+  article, aside, details, figcaption, figure,
+  footer, header, hgroup, menu, nav, section {
+    display: block;
+  }
+  body {
+    line-height: 1;
+    font-family: "Inter", sans-serif;
+    background: #f3f5fc;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    border: 1px solid #0a3871;
+    background: #fff;
+  }
+  .container {
+    width: 350px;
+    background: #f3f5fc;
+    border-radius: 0;
+    padding: 20px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  #grupo-lineas input,
+  #ingresar-letras input,
+  #error-letras input {
+    width: 30px;
+    height: 40px;
+    margin: 0 2px;
+    font-size: 28px;
+    text-align: center;
+    border: 2px solid #0a3871;
+    border-radius: 6px;
+    background: #e6e9f7;
+    pointer-events: none;
+  }
+  #error-letras {
+    margin-top: 15px;
+    min-height: 50px;
+  }
+  .btn {
+    padding: 15px 30px;
+    border-radius: 24px;
+    border: none;
+    color: #fff;
+    font-size: 18px;
+    margin: 10px 5px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .btn-iniciar-juego {
+    background: #0a3871;
+    width: 100%;
+  }
+  .btn-pista {
+    background: #0a3871;
+    width: 100%;
+  }
+  .btn-desistir {
+    background: #b03030;
+    width: 100%;
+  }
+  #mensaje-pista {
+    margin-top: 12px;
+    color: #0a3871;
+    font-weight: 600;
+  }
+
+
+</style>
+</head>
+<body>
+<div class="container">
+  <canvas id="pantalla" width="300" height="150"></canvas>
+  <div id="grupo-lineas"></div>
+  <div id="ingresar-letras"></div>
+  <div id="error-letras"></div>
+  <button id="btn-pista" class="btn btn-pista">Pista (1 oportunidad)</button>
+  <div id="mensaje-pista"></div>
+  <button id="btn-desistir" class="btn btn-desistir">Desistir</button>
+</div>
+
+<!-- SweetAlert2 CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- Howler.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+<!-- JSConfetti CDN -->
+<script src="https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js"></script>
+
+<script>
+(() => {
+  const palabras_secretas = [
+    "PERRO",
+    "GATO",
+    "CASA",
+    "SILLA",
+    "MESA",
+    "ÁRBOL",
+    "LIBRO",
+    "SOL",
+    "LUNA",
+    "CIELO",
+    "FLOR",
+    "RÍO",
+    "MAR",
+    "NIÑO",
+    "MANO",
+    "PINGÜINO",
+    "ÑANDÚ"
+  ];
+
+  let juego_terminado = false;
+  let pista_usada = false;
+  let intentos = 0;
+  let array_letras = [];
+  let array_palabra_verificar = [];
+  let array_errores = [];
+
+  const pantalla = document.getElementById("pantalla");
+  const pincel = pantalla.getContext("2d");
+  const grupo_lineas = document.getElementById("grupo-lineas");
+  const ingresar_letras = document.getElementById("ingresar-letras");
+  const error_letras = document.getElementById("error-letras");
+  const btn_pista = document.getElementById("btn-pista");
+  const mensaje_pista = document.getElementById("mensaje-pista");
+  const btn_desistir = document.getElementById("btn-desistir");
+
+  // Funciones dibujo del ahorcado:
+  function limpiarCanvas() {
+    pincel.clearRect(0, 0, pantalla.width, pantalla.height);
+  }
+  function base() {
+    pincel.fillStyle = "#0A3871";
+    pincel.fillRect(100, 140, 100, 2);
+  }
+  function columna_base() {
+    pincel.fillStyle = "#0A3871";
+    pincel.fillRect(127, 20, 2, 120);
+  }
+  function lina_horizontal_base() {
+    pincel.fillStyle = "#0A3871";
+    pincel.fillRect(127, 20, 60, 2);
+  }
+  function lina_vertical_base() {
+    pincel.fillStyle = "#0A3871";
+    pincel.fillRect(187, 20, 2, 15);
+  }
+  function cabeza() {
+    pincel.strokeStyle = "#0A3871";
+    pincel.beginPath();
+    pincel.arc(188, 45, 10, 0, 2 * Math.PI, true);
+    pincel.lineWidth = 2;
+    pincel.closePath();
+    pincel.stroke();
+  }
+  function columna_persona() {
+    pincel.fillStyle = "#0A3871";
+    pincel.fillRect(187, 55, 2, 45);
+  }
+  function brazo_izquiero() {
+    pincel.strokeStyle = "#0A3871";
+    pincel.beginPath();
+    pincel.moveTo(187, 55);
+    pincel.lineTo(176, 80);
+    pincel.lineWidth = 2;
+    pincel.closePath();
+    pincel.stroke();
+  }
+  function brazo_derecho() {
+    pincel.strokeStyle = "#0A3871";
+    pincel.beginPath();
+    pincel.moveTo(189, 55);
+    pincel.lineTo(200, 80);
+    pincel.lineWidth = 2;
+    pincel.closePath();
+    pincel.stroke();
+  }
+  function pie_izquiero() {
+    pincel.strokeStyle = "#0A3871";
+    pincel.beginPath();
+    pincel.moveTo(187, 100);
+    pincel.lineTo(176, 125);
+    pincel.lineWidth = 2;
+    pincel.closePath();
+    pincel.stroke();
+  }
+  function pie_derecho() {
+    pincel.strokeStyle = "#0A3871";
+    pincel.beginPath();
+    pincel.moveTo(189, 100);
+    pincel.lineTo(200, 125);
+    pincel.lineWidth = 2;
+    pincel.closePath();
+    pincel.stroke();
+  }
+
+  function verificar_intentos(intentos) {
+    switch (intentos) {
+      case 1: columna_base(); break;
+      case 2: lina_horizontal_base(); break;
+      case 3: lina_vertical_base(); break;
+      case 4: cabeza(); break;
+      case 5: columna_persona(); break;
+      case 6: brazo_izquiero(); break;
+      case 7: brazo_derecho(); break;
+      case 8: pie_izquiero(); break;
+      case 9:
+        pie_derecho();
+        juego_terminado = true;
+        music_perdedor();
+        setTimeout(() => {
+          show_swal_perdiste();
+        }, 800);
+        break;
+    }
+  }
+
+  // Elegir palabra aleatoria
+  function numero_aleatorio(max) {
+    return Math.floor(Math.random() * max);
+  }
+  const palabra_elegida = palabras_secretas[numero_aleatorio(palabras_secretas.length)];
+  array_letras = Array.from(palabra_elegida);
+  array_palabra_verificar = Array.from(palabra_elegida);
+
+  // Mostrar guiones y inputs de letras
+  function mostrar_guiones() {
+    let html = "";
+    for (let i = 0; i < palabra_elegida.length; i++) {
+      html += `<input type="text" disabled />`;
+    }
+    grupo_lineas.innerHTML = html;
+  }
+  function cargar_input_letras() {
+    let html = "";
+    for (let i = 0; i < palabra_elegida.length; i++) {
+      html += `<input type="text" id="letra-${i}" disabled />`;
+    }
+    ingresar_letras.innerHTML = html;
+  }
+
+  // Mostrar letras correctas
+  function show_letras_correct(caracter) {
+    const posiciones = [];
+    array_palabra_verificar.forEach((letra, i) => {
+      if (letra === caracter) posiciones.push(i);
+    });
+    if (posiciones.length === 0) return false;
+
+    posiciones.forEach(pos => {
+      document.getElementById(`letra-${pos}`).value = array_letras[pos];
+      array_palabra_verificar[pos] = ""; // ya encontrada
+    });
+
+    if (array_palabra_verificar.every(l => l === "")) {
+      juego_terminado = true;
+      music_ganador();
+ 
+      setTimeout(() => show_swal_ganaste(), 500);
+    }
+  }
+
+  // Mostrar letras error
+  function show_letras_error(caracter) {
+    if (array_errores.includes(caracter)) return;
+    array_errores.push(caracter);
+    intentos++;
+    verificar_intentos(intentos);
+
+    // Mostrar letra en área de error
+    error_letras.innerHTML += `<input type="text" disabled value="${caracter}" />`;
+  }
+
+  // Validar letra permitida (mayúscula, Ñ, Ä, Ë, Ï, Ö, Ü)
+  function letra_valida(c) {
+    return /^[A-ZÄËÏÖÜÑ]$/.test(c);
+  }
+
+  // Ejecutar juego con letra ingresada
+  function ejecutar_juego_caracter(caracter) {
+    if (!letra_valida(caracter)) {
+      show_toast("info", "Solo letras válidas sin tildes");
+      return;
+    }
+    if (array_palabra_verificar.includes(caracter)) {
+      show_letras_correct(caracter);
+    } else {
+      show_letras_error(caracter);
+    }
+  }
+
+  // Eventos teclado
+  function manejar_teclado(event) {
+    if (juego_terminado) return;
+    let letra = event.key.toUpperCase();
+    ejecutar_juego_caracter(letra);
+  }
+
+  // Pista (solo 1 vez)
+  btn_pista.addEventListener("click", () => {
+    if (pista_usada) {
+      mensaje_pista.textContent = "Ya usaste tu pista.";
+      return;
+    }
+    pista_usada = true;
+    // Mostrar una letra que NO haya sido revelada aún
+    const indices_disponibles = [];
+    array_palabra_verificar.forEach((letra, i) => {
+      if (letra !== "") indices_disponibles.push(i);
+    });
+    if (indices_disponibles.length === 0) return;
+    const index_pista = indices_disponibles[numero_aleatorio(indices_disponibles.length)];
+    const letra_pista = array_palabra_verificar[index_pista];
+    show_letras_correct(letra_pista);
+    mensaje_pista.textContent = `Pista: letra "${letra_pista}" revelada.`;
+    btn_pista.disabled = true;
+  });
+
+  // Botón desistir
+  btn_desistir.addEventListener("click", () => {
+    if (juego_terminado) return;
+    juego_terminado = true;
+    music_perdedor();
+    show_swal_desistir();
+  });
+
+  // Mensajes Swal
+  function show_swal_perdiste() {
+    Swal.fire({
+      icon: "error",
+      title: "¡Perdiste!",
+      html: `La palabra era: <b>${palabra_elegida}</b><br>¿Quieres jugar otra vez?`,
+      showCloseButton: true,
+      showDenyButton: true,
+      confirmButtonText: "Sí",
+      denyButtonText: "No",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      allowEnterKey: false
+    }).then(result => {
+      if (result.isConfirmed) window.location.reload();
+      else if (result.isDenied) window.location.href = "./";
+    });
+  }
+
+  function show_swal_ganaste() {
+    Swal.fire({
+      icon: "success",
+      title: "¡Ganaste!",
+      text: "¿Quieres jugar otra vez?",
+      showCloseButton: true,
+      showDenyButton: true,
+      confirmButtonText: "Sí",
+      denyButtonText: "No",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      allowEnterKey: false
+    }).then(result => {
+      if (result.isConfirmed) window.location.reload();
+      else if (result.isDenied) window.location.href = "./";
+    });
+  }
+
+  function show_swal_desistir() {
+    Swal.fire({
+      icon: "warning",
+      title: "Has desistido",
+      html: `La palabra era: <b>${palabra_elegida}</b><br>¿Quieres jugar otra vez?`,
+      showCloseButton: true,
+      showDenyButton: true,
+      confirmButtonText: "Sí",
+      denyButtonText: "No",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      allowEnterKey: false
+    }).then(result => {
+      if (result.isConfirmed) window.location.reload();
+      else if (result.isDenied) window.location.href = "./";
+    });
+  }
+
+  // Sonidos con Howler.js
+  function music_perdedor() {
+    const sound = new Howl({
+      src: ["https://github.com/JakubSkraly/ahorcado-java-script/raw/main/sound/perdedor.mp3"],
+      html5: true,
+    });
+    sound.play();
+  }
+  function music_ganador() {
+    const sound = new Howl({
+      src: ["https://github.com/JakubSkraly/ahorcado-java-script/raw/main/sound/ganador.mp3"],
+      html5: true,
+    });
+    sound.play();
+  }
+
+  // Confetti con js-confetti
+  const jsConfetti = new JSConfetti({ canvas: pantalla });
+  function show_confetti() {
+    jsConfetti.addConfetti({ confettiNumber: 150 });
+  }
+
+  // Toast Swal
+  function show_toast(icon, message) {
+    const Toast = Swal.mixin({
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true,
+      didOpen: (toast) => {
+        toast.addEventListener("mouseenter", Swal.stopTimer);
+        toast.addEventListener("mouseleave", Swal.resumeTimer);
+      }
+    });
+    Toast.fire({ icon, title: message });
+  }
+
+  // Inicializar
+  function iniciar_juego() {
+    limpiarCanvas();
+    base();
+    mostrar_guiones();
+    cargar_input_letras();
+    document.addEventListener("keydown", manejar_teclado);
+  }
+
+  iniciar_juego();
+
+})();
+</script>
+</body>
+</html>
